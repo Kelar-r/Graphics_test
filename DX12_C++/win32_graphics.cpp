@@ -42,6 +42,8 @@ int APIENTRY WinMain(
 	int       nShowCmd) 
 {
 	GlobalState.isRunnig = true;
+	LARGE_INTEGER TimerFrequency = {};
+	Assert(QueryPerformanceFrequency(&TimerFrequency));                  //Щетчик кадрів
 
 
 	{
@@ -50,7 +52,7 @@ int APIENTRY WinMain(
 		WindowClass.lpfnWndProc = Win32WindowsCallBack;                  //Вказівник до повідомлень що приходитимуть від віндовс
 		WindowClass.hInstance = hInstance;                               //Зразок програми
 		WindowClass.hCursor = LoadCursorA(NULL, IDC_WAIT);               //Курсор Програми 
-		WindowClass.lpszClassName = "Bonjour come us EVERY BODY SUCK MY DICK";                //ім'я нашого класу
+		WindowClass.lpszClassName = "Bonjour";                //ім'я нашого класу
 
 		if (!RegisterClassA(&WindowClass))
 		{
@@ -62,7 +64,7 @@ int APIENTRY WinMain(
 		GlobalState.WindowHandle = CreateWindowExA(
 			0,                                                           //Тут можна теж водити різні стилі вікна  
 			WindowClass.lpszClassName,                                   //Ім'я нашого класу Х2
-			"EVERY BODY SUCK MY DICK",                                   //Ім'я нашого вікна
+			"Graphic Test",                                   //Ім'я нашого вікна
 			WS_OVERLAPPEDWINDOW | WS_VISIBLE,                            //Знову стилі але WS_VISIBLE якщо його не буде то ми не побачимо наше вікно взагалі бо воно буде невидиме https://learn.microsoft.com/en-us/windows/win32/winmsg/window-styles
 			CW_USEDEFAULT,                                               //Положення вікна по Х
 			CW_USEDEFAULT,                                               //Положення вікна по Y
@@ -90,11 +92,18 @@ int APIENTRY WinMain(
 		GlobalState.FrameBufferPixels = (u32*)malloc(sizeof(u32) * GlobalState.FrameBufferWidth * GlobalState.FrameBufferHeight);  //Виділення пам'яті
 	}
 	
-
+	LARGE_INTEGER BeginTime = {};                                    //Початковий час кадру
+	LARGE_INTEGER EndTime = {};                                      //Кінцевий час кадру
+	Assert(QueryPerformanceCounter(&BeginTime));                    
 
 
 	while (GlobalState.isRunnig)                                     //Головний цикл який перевіряє чи програма закрита
 	{
+		Assert(QueryPerformanceCounter(&EndTime));
+		f32 FrameTime = f32(EndTime.QuadPart - BeginTime.QuadPart) / f32(TimerFrequency.QuadPart);             //Формула для обчислення часу кадра
+		BeginTime = EndTime;
+
+
 		MSG Message = {};
 		while (PeekMessageA(&Message, GlobalState.WindowHandle, 0, 0, PM_REMOVE))              //Цикл для перевірки повідомлень
 		{
@@ -112,13 +121,25 @@ int APIENTRY WinMain(
 		}
 
 
+		f32 Speed = 200.0f;
+		GlobalState.CurrOffSet += Speed * FrameTime;
+
 
 		for (u32 Y = 0; Y < GlobalState.FrameBufferHeight; ++Y) 
 		{
 			for (u32 X = 0; X < GlobalState.FrameBufferWidth; ++X)
 			{
 				u32 PixelId = Y * GlobalState.FrameBufferWidth + X;                 //Формула обчисленняя пікселя в пам'яті
-				GlobalState.FrameBufferPixels[PixelId] = 0X00ff0066;                //Даємо колір тому пікселю Патерн ARGB
+
+				u8 Red = (u8)(X + GlobalState.CurrOffSet);                          //Обчислюємо Колір пікселя
+				u8 Green = (u8)(Y + GlobalState.CurrOffSet);
+				u8 Blue = GlobalState.CurrOffSet;
+				u8 Alfa = 255;
+				u32 PixelColor = ((u32)Alfa << 24) | ((u32)Red << 16) | ((u32)Green << 8) | (u32)Blue;
+
+				GlobalState.FrameBufferPixels[PixelId] = PixelColor;                //Даємо колір тому пікселю Патерн ARGB
+
+
 			}
 		}
 
