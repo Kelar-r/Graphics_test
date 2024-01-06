@@ -44,38 +44,54 @@ int APIENTRY WinMain(
 	GlobalState.isRunnig = true;
 
 
-	WNDCLASSA WindowClass = {};
-	WindowClass.style = CS_VREDRAW | CS_HREDRAW | CS_OWNDC;          //Цей рядок відповідає за стиль вікна ось ці парапори https://learn.microsoft.com/ru-ru/windows/win32/winmsg/window-class-styles
-	WindowClass.lpfnWndProc = Win32WindowsCallBack;                  //Вказівник до повідомлень що приходитимуть від віндовс
-	WindowClass.hInstance = hInstance;                               //Зразок програми
-	WindowClass.hCursor = LoadCursorA(NULL, IDC_WAIT);               //Курсор Програми 
-	WindowClass.lpszClassName = "Bonjour come us EVERY BODY SUCK MY DICK";                //ім'я нашого класу
-
-	if (!RegisterClassA(&WindowClass)) 
 	{
-		InvalideCodePatch;
+		WNDCLASSA WindowClass = {};
+		WindowClass.style = CS_VREDRAW | CS_HREDRAW | CS_OWNDC;          //Цей рядок відповідає за стиль вікна ось ці парапори https://learn.microsoft.com/ru-ru/windows/win32/winmsg/window-class-styles
+		WindowClass.lpfnWndProc = Win32WindowsCallBack;                  //Вказівник до повідомлень що приходитимуть від віндовс
+		WindowClass.hInstance = hInstance;                               //Зразок програми
+		WindowClass.hCursor = LoadCursorA(NULL, IDC_WAIT);               //Курсор Програми 
+		WindowClass.lpszClassName = "Bonjour come us EVERY BODY SUCK MY DICK";                //ім'я нашого класу
+
+		if (!RegisterClassA(&WindowClass))
+		{
+			InvalideCodePatch;
+		}
+
+
+
+		GlobalState.WindowHandle = CreateWindowExA(
+			0,                                                           //Тут можна теж водити різні стилі вікна  
+			WindowClass.lpszClassName,                                   //Ім'я нашого класу Х2
+			"EVERY BODY SUCK MY DICK",                                   //Ім'я нашого вікна
+			WS_OVERLAPPEDWINDOW | WS_VISIBLE,                            //Знову стилі але WS_VISIBLE якщо його не буде то ми не побачимо наше вікно взагалі бо воно буде невидиме https://learn.microsoft.com/en-us/windows/win32/winmsg/window-styles
+			CW_USEDEFAULT,                                               //Положення вікна по Х
+			CW_USEDEFAULT,                                               //Положення вікна по Y
+			1280,                                                        //Розмір вікна по Х
+			720,                                                         //Розмір вікна по Y
+			NULL,                                                        //Чи Пов'язане це вікно з іншими
+			NULL,                                                        //Чи буде меню в вікні
+			hInstance,
+			NULL);
+
+		if (!GlobalState.WindowHandle)
+		{
+			InvalideCodePatch;
+		}
+
+		GlobalState.DeviceContext = GetDC(GlobalState.WindowHandle);
 	}
 
 
-
-	GlobalState.WindowHandle = CreateWindowExA(
-		0,                                                           //Тут можна теж водити різні стилі вікна  
-		WindowClass.lpszClassName,                                   //Ім'я нашого класу Х2
-		"EVERY BODY SUCK MY DICK",                                   //Ім'я нашого вікна
-		WS_OVERLAPPEDWINDOW | WS_VISIBLE,                            //Знову стилі але WS_VISIBLE якщо його не буде то ми не побачимо наше вікно взагалі бо воно буде невидиме https://learn.microsoft.com/en-us/windows/win32/winmsg/window-styles
-		CW_USEDEFAULT,                                               //Положення вікна по Х
-		CW_USEDEFAULT,                                               //Положення вікна по Y
-		1280,                                                        //Розмір вікна по Х
-		720,                                                         //Розмір вікна по Y
-		NULL,                                                        //Чи Пов'язане це вікно з іншими
-		NULL,                                                        //Чи буде меню в вікні
-		hInstance,
-		NULL);
-
-	if (!GlobalState.WindowHandle) 
 	{
-		InvalideCodePatch;
+		RECT ClientRect = {};
+		Assert(GetClientRect(GlobalState.WindowHandle, &ClientRect));
+		GlobalState.FrameBufferWidth = ClientRect.right - ClientRect.left;
+		GlobalState.FrameBufferHeight = ClientRect.bottom - ClientRect.top;
+		GlobalState.FrameBufferPixels = (u32*)malloc(sizeof(u32) * GlobalState.FrameBufferWidth * GlobalState.FrameBufferHeight);  //Виділення пам'яті
 	}
+	
+
+
 
 	while (GlobalState.isRunnig)                                     //Головний цикл який перевіряє чи програма закрита
 	{
@@ -94,6 +110,49 @@ int APIENTRY WinMain(
 				} break;
 			}
 		}
+
+
+
+		for (u32 Y = 0; Y < GlobalState.FrameBufferHeight; ++Y) 
+		{
+			for (u32 X = 0; X < GlobalState.FrameBufferWidth; ++X)
+			{
+				u32 PixelId = Y * GlobalState.FrameBufferWidth + X;                 //Формула обчисленняя пікселя в пам'яті
+				GlobalState.FrameBufferPixels[PixelId] = 0X00ff0066;                //Даємо колір тому пікселю Патерн ARGB
+			}
+		}
+
+
+		
+		RECT ClientRect = {};                                                  //Дізнаємось розмір робочої площі
+		Assert(GetClientRect(GlobalState.WindowHandle, &ClientRect));
+		u32 ClientWidth = ClientRect.right - ClientRect.left;
+		u32 ClientHeight = ClientRect.bottom - ClientRect.top;
+		
+
+		BITMAPINFO BitMapInfo = {};
+		BitMapInfo.bmiHeader.biSize = sizeof(tagBITMAPINFOHEADER);
+		BitMapInfo.bmiHeader.biWidth = GlobalState.FrameBufferWidth;
+		BitMapInfo.bmiHeader.biHeight = GlobalState.FrameBufferHeight;
+		BitMapInfo.bmiHeader.biPlanes = 1;                                         //Це лайно повинно бути завжди 1
+		BitMapInfo.bmiHeader.biBitCount = 32;
+		BitMapInfo.bmiHeader.biCompression = BI_RGB;
+
+		//Копіюємо буфер до вікна
+		Assert(StretchDIBits(
+			GlobalState.DeviceContext,
+			0,                                                                      //Де положений Прямокутник до якого копіюємо у вікні по Х
+			0,                                                                      //Де положений Прямокутник до якого копіюємо у вікні по Y
+			ClientWidth,                                                            //Розмір клієнтської площі ширина
+			ClientHeight,                                                           //Розмір клієнтської площі висота
+			0,                                                                      //Положення трикутника в Буфері по Х
+			0,                                                                      //Положення трикутника в Буфері по Y
+			GlobalState.FrameBufferWidth,
+			GlobalState.FrameBufferHeight,
+			GlobalState.FrameBufferPixels,
+			&BitMapInfo,
+			DIB_RGB_COLORS,
+			SRCCOPY));
 	}
 
 
