@@ -129,7 +129,7 @@ int APIENTRY WinMain(
 					GlobalState.isRunnig = false;
 				} break;
 				default: {
-					TranslateMessage(&Message);                       //Розшифрування повідомлень
+					TranslateMessage(&Message);                        //Розшифрування повідомлень
 					DispatchMessage(&Message);                        //реагування на ті повідомлення по замовчуванню
 				} break;
 			}
@@ -144,24 +144,24 @@ int APIENTRY WinMain(
 		{
 			for (u32 X = 0; X < GlobalState.FrameBufferWidth; ++X)
 			{
-				u32 PixelId = Y * GlobalState.FrameBufferWidth + X;                 //Формула обчисленняя пікселя в пам'яті
+				u32 PixelId = Y * GlobalState.FrameBufferWidth + X;                    //Формула обчисленняя пікселя в пам'яті
 
-				u8 Red = 00;                          //Обчислюємо Колір пікселя
+				u8 Red = 00;                                                         //Обчислюємо Колір пікселя
 				u8 Green = 00;
 				u8 Blue = 00;
 				u8 Alfa = 255;
 				u32 PixelColor = ((u32)Alfa << 24) | ((u32)Red << 16) | ((u32)Green << 8) | (u32)Blue;
 
-				GlobalState.FrameBufferPixels[PixelId] = PixelColor;                //Даємо колір тому пікселю Патерн ARGB
+				GlobalState.FrameBufferPixels[PixelId] = PixelColor;            //Даємо колір тому пікселю Патерн ARGB
 
 
 			}
 		}
 		
-		for (u32 TriangleId = 0; TriangleId < 5; ++TriangleId) 
+		for (u32 TriangleId = 0; TriangleId < 5; ++TriangleId)                                      //Обчислюємо кількість трикутників
 		{
-			f32 Depth = powf(2, TriangleId + 1);
-
+			f32 Depth = powf(2, TriangleId + 1);                                                  //Обчислюємо глибину кожного трикутника
+			    
 			v3 Points[3] = {
 				V3(-1.0f, -0.5f, Depth),                                                       // Ліва точка трикутника
 				V3(1.0f, -0.5f, Depth),                                                       // Права точка трикутника
@@ -177,7 +177,14 @@ int APIENTRY WinMain(
 					PixelPos.y >= 0.0f && PixelPos.y < GlobalState.FrameBufferHeight)
 				{
 					u32 PixelId = u32(PixelPos.y) * GlobalState.FrameBufferWidth + u32(PixelPos.x);
-					GlobalState.FrameBufferPixels[PixelId] = 0xFF00FF00;
+
+
+					u8 Red = PixelPos.x;                                             //Обчислюємо Колір пікселів трикутника
+					u8 Green = PixelPos.y;
+					u8 Blue = GlobalState.CurrOffSet;
+					u8 Alfa = 255;
+					u32 PixelColor = ((u32)Alfa << 24) | ((u32)Red << 16) | ((u32)Green << 8) | (u32)Blue;
+					GlobalState.FrameBufferPixels[PixelId] = PixelColor;
 				}
 			}
 		}
@@ -199,18 +206,18 @@ int APIENTRY WinMain(
 		BitMapInfo.bmiHeader.biSize = sizeof(tagBITMAPINFOHEADER);
 		BitMapInfo.bmiHeader.biWidth = GlobalState.FrameBufferWidth;
 		BitMapInfo.bmiHeader.biHeight = GlobalState.FrameBufferHeight;
-		BitMapInfo.bmiHeader.biPlanes = 1;                                         //Це лайно повинно бути завжди 1
+		BitMapInfo.bmiHeader.biPlanes = 1;                                                    //Це лайно повинно бути завжди 1
 		BitMapInfo.bmiHeader.biBitCount = 32;
 		BitMapInfo.bmiHeader.biCompression = BI_RGB;
 
 		//Копіюємо буфер до вікна
 		Assert(StretchDIBits(
 			GlobalState.DeviceContext,
-			0,                                                                      //Де положений Прямокутник до якого копіюємо у вікні по Х
-			0,                                                                      //Де положений Прямокутник до якого копіюємо у вікні по Y
-			ClientWidth,                                                            //Розмір клієнтської площі ширина
-			ClientHeight,                                                           //Розмір клієнтської площі висота
-			0,                                                                      //Положення трикутника в Буфері по Х
+			0,                                                                           //Де положений Прямокутник до якого копіюємо у вікні по Х
+			0,                                                                          //Де положений Прямокутник до якого копіюємо у вікні по Y
+			ClientWidth,                                                               //Розмір клієнтської площі ширина
+			ClientHeight,                                                             //Розмір клієнтської площі висота
+			0,                                                                       //Положення трикутника в Буфері по Х
 			0,                                                                      //Положення трикутника в Буфері по Y
 			GlobalState.FrameBufferWidth,
 			GlobalState.FrameBufferHeight,
