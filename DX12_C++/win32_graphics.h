@@ -36,6 +36,7 @@ typedef int32_t b32;
 #define GigaBytes(Val) (MegaBytes(Val)*1024LL)
 #define TeraBytes(Val) (GigaBytes(Val)*1024LL)
 
+#include "graphics_math.h"
 
 struct global_state
 {
@@ -47,6 +48,7 @@ struct global_state
 	u32* FrameBufferPixels;
 
 	f32 CurrOffSet;
+	f32 CurrAngle;
 };
 
 #define WIN32_GRAPHICS_H
