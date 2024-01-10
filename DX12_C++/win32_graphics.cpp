@@ -20,6 +20,47 @@ v2 ProjetPoint(v3 WorldPos)
 	return Result;
 }
 
+
+f32 CrossProduct2d(v2 A, v2 B)
+{
+	f32 Result = A.x * B.y - A.y * B.x;
+	return Result;
+}
+
+
+void DrawTriangle(v3* Points, u32 Color) 
+{
+	v2 PointA = ProjetPoint(Points[0]);
+	v2 PointB = ProjetPoint(Points[1]);
+	v2 PointC = ProjetPoint(Points[2]);
+
+	v2 Edge0 = PointB - PointA;
+	v2 Edge1 = PointC - PointB;
+	v2 Edge2 = PointA - PointC;
+
+	for (u32 Y = 0; Y < GlobalState.FrameBufferHeight; ++Y)
+	{
+		for (u32 X = 0; X < GlobalState.FrameBufferWidth; ++X)
+		{
+			v2 PixelPoint = V2(X, Y) + V2(0.5f, 0.5f);
+
+			v2 PixelEdge0 = PixelPoint - PointA;
+			v2 PixelEdge1 = PixelPoint - PointB;
+			v2 PixelEdge2 = PixelPoint - PointC;
+
+			if (CrossProduct2d(PixelEdge0, Edge0) >= 0.0f &&
+				CrossProduct2d(PixelEdge1, Edge1) >= 0.0f &&
+				CrossProduct2d(PixelEdge2, Edge2) >= 0.0f) 
+			{
+				// Це середина трикутника
+				u32 PixelId = Y * GlobalState.FrameBufferWidth + X;
+				GlobalState.FrameBufferPixels[PixelId] = Color;
+			}
+		}
+	}
+}
+
+
 LRESULT Win32WindowsCallBack(
 	HWND WindowHandle,
 	UINT Message,
@@ -152,47 +193,54 @@ int APIENTRY WinMain(
 				u8 Alfa = 255;
 				u32 PixelColor = ((u32)Alfa << 24) | ((u32)Red << 16) | ((u32)Green << 8) | (u32)Blue;
 
-				GlobalState.FrameBufferPixels[PixelId] = PixelColor;            //Даємо колір тому пікселю Патерн ARGB
+				GlobalState.FrameBufferPixels[PixelId] = PixelColor;            //Даємо колір Фону Патерн ARGB
 
 
 			}
 		}
 		
-		for (u32 TriangleId = 0; TriangleId < 5; ++TriangleId)                                      //Обчислюємо кількість трикутників
+		
+		//Проєктуємо наші трикутники
+		GlobalState.CurrAngle += FrameTime;
+		if (GlobalState.CurrAngle >= 2.0f * Pi32)
+		{
+			GlobalState.CurrAngle -= 2.0f * Pi32;
+		}
+
+		u32 Colors[] = 
+		{
+			0xFF0033AA,                                                                              //UA Blue назва цього кольору
+			0xFF1D2951,
+			0xFF3F00FF,
+			0xFF87CEEB,
+			0xFF483D8B,
+		};
+
+		/*u32 Colors[] =
+		{
+			0xFF00FF00,
+			0xFFFF00FF,
+			0xFF0000FF,
+		};*/
+
+		for (i32 TriangleId = 9; TriangleId >= 0; --TriangleId)                                      //Обчислюємо кількість трикутників
 		{
 			f32 Depth = powf(2, TriangleId + 1);                                                  //Обчислюємо глибину кожного трикутника
 			    
 			v3 Points[3] = {
-				V3(-1.0f, -0.5f, Depth),                                                       // Ліва точка трикутника
-				V3(1.0f, -0.5f, Depth),                                                       // Права точка трикутника
-				V3(0.0f, 0.5f, Depth),                                                       // Середя точка трикутника
+				V3(-1.0f, -0.5f, Depth),                                                       // Ліва точка трикутника   X Y Z
+				V3(0.0f, 0.5f, Depth),                                                        // Середя точка трикутника   X Y Z
+				V3(1.0f, -0.5f, Depth),                                                      // Права точка трикутника   X Y Z
 			};
 
-			for (u32 PointId = 0; PointId < ArrayCount(Points); ++PointId)
+			
+			for (u32 PointId = 0; PointId < ArrayCount(Points); ++PointId)               //Рухаємо точки трикутника в коло
 			{
 				v3 TransformedPos = Points[PointId] + V3(cosf(GlobalState.CurrAngle), sinf(GlobalState.CurrAngle), 0);
-				v2 PixelPos = ProjetPoint(TransformedPos);
-
-				if (PixelPos.x >= 0.0f && PixelPos.x < GlobalState.FrameBufferWidth &&
-					PixelPos.y >= 0.0f && PixelPos.y < GlobalState.FrameBufferHeight)
-				{
-					u32 PixelId = u32(PixelPos.y) * GlobalState.FrameBufferWidth + u32(PixelPos.x);
-
-
-					u8 Red = PixelPos.x;                                             //Обчислюємо Колір пікселів трикутника
-					u8 Green = PixelPos.y;
-					u8 Blue = GlobalState.CurrOffSet;
-					u8 Alfa = 255;
-					u32 PixelColor = ((u32)Alfa << 24) | ((u32)Red << 16) | ((u32)Green << 8) | (u32)Blue;
-					GlobalState.FrameBufferPixels[PixelId] = PixelColor;
-				}
+				Points[PointId] = TransformedPos;
 			}
-		}
-
-		GlobalState.CurrAngle += FrameTime;
-		if (GlobalState.CurrAngle >= 2.0f * Pi32) 
-		{
-			GlobalState.CurrAngle -= 2.0f * Pi32;
+			
+			DrawTriangle(Points, Colors[TriangleId % (ArrayCount(Colors))]);
 		}
 
 		
