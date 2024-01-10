@@ -23,7 +23,7 @@ v2 ProjetPoint(v3 WorldPos)
 
 f32 CrossProduct2d(v2 A, v2 B)
 {
-	f32 Result = A.x * B.y - A.y * B.x;
+	f32 Result = A.x * B.y - A.y * B.x;                     //Формула ребра трикутника де A Це кординати пікседя а Б Ребра
 	return Result;
 }
 
@@ -34,9 +34,16 @@ void DrawTriangle(v3* Points, u32 Color)
 	v2 PointB = ProjetPoint(Points[1]);
 	v2 PointC = ProjetPoint(Points[2]);
 
+	//Визначаємо Сторони трикутника
 	v2 Edge0 = PointB - PointA;
 	v2 Edge1 = PointC - PointB;
 	v2 Edge2 = PointA - PointC;
+
+	//Перевірка кожного ребра чи воно є головним
+	b32 IsTopLeft0 = (Edge0.y > 0.0f) || (Edge0.x > 0.0f && Edge0.y == 0.0f);
+	b32 IsTopLeft1 = (Edge1.y > 0.0f) || (Edge1.x > 0.0f && Edge1.y == 0.0f);
+	b32 IsTopLeft2 = (Edge2.y > 0.0f) || (Edge2.x > 0.0f && Edge2.y == 0.0f);
+
 
 	for (u32 Y = 0; Y < GlobalState.FrameBufferHeight; ++Y)
 	{
@@ -48,9 +55,15 @@ void DrawTriangle(v3* Points, u32 Color)
 			v2 PixelEdge1 = PixelPoint - PointB;
 			v2 PixelEdge2 = PixelPoint - PointC;
 
-			if (CrossProduct2d(PixelEdge0, Edge0) >= 0.0f &&
-				CrossProduct2d(PixelEdge1, Edge1) >= 0.0f &&
-				CrossProduct2d(PixelEdge2, Edge2) >= 0.0f) 
+			//Записуємо результат формули ребра квадрата
+			f32 CrossLenght0 = CrossProduct2d(PixelEdge0, Edge0);
+			f32 CrossLenght1 = CrossProduct2d(PixelEdge1, Edge1);
+			f32 CrossLenght2 = CrossProduct2d(PixelEdge2, Edge2);
+
+			//Перевірка чи ми в середені трикутника
+			if ((CrossLenght0 > 0.0f || (IsTopLeft0 && CrossLenght0 == 0.0f)) &&
+				(CrossLenght1 > 0.0f || (IsTopLeft1 && CrossLenght1 == 0.0f)) &&
+				(CrossLenght2 > 0.0f || (IsTopLeft2 && CrossLenght2 == 0.0f)))
 			{
 				// Це середина трикутника
 				u32 PixelId = Y * GlobalState.FrameBufferWidth + X;
@@ -143,8 +156,8 @@ int APIENTRY WinMain(
 		Assert(GetClientRect(GlobalState.WindowHandle, &ClientRect));
 		//GlobalState.FrameBufferWidth = ClientRect.right - ClientRect.left;
 		//GlobalState.FrameBufferHeight = ClientRect.bottom - ClientRect.top;
-		GlobalState.FrameBufferWidth = 340;
-		GlobalState.FrameBufferHeight = 340;
+		GlobalState.FrameBufferWidth = 350;
+		GlobalState.FrameBufferHeight = 350;
 		GlobalState.FrameBufferPixels = (u32*)malloc(sizeof(u32) * GlobalState.FrameBufferWidth * GlobalState.FrameBufferHeight);  //Виділення пам'яті
 	}
 	
@@ -216,12 +229,6 @@ int APIENTRY WinMain(
 			0xFF483D8B,
 		};
 
-		/*u32 Colors[] =
-		{
-			0xFF00FF00,
-			0xFFFF00FF,
-			0xFF0000FF,
-		};*/
 
 		for (i32 TriangleId = 9; TriangleId >= 0; --TriangleId)                                      //Обчислюємо кількість трикутників
 		{
