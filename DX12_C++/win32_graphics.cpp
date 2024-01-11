@@ -87,7 +87,6 @@ void DrawTriangle(v3* Points, v3* Colors)
 				(CrossLenght1 > 0.0f || (IsTopLeft1 && CrossLenght1 == 0.0f)) &&
 				(CrossLenght2 > 0.0f || (IsTopLeft2 && CrossLenght2 == 0.0f)))
 			{
-				// Це середина трикутника
 				u32 PixelId = Y * GlobalState.FrameBufferWidth + X;
 
 				//Обчислюємо барицентричні координати
@@ -95,12 +94,18 @@ void DrawTriangle(v3* Points, v3* Colors)
 				f32 T1 = -CrossLenght2 / BarryCentricDiv;
 				f32 T2 = -CrossLenght0 / BarryCentricDiv;
 
-				//Перетворюємо кольори з одного стандарту в інший
-				v3 FinalColor = T0 * Colors[0] + T1 * Colors[1] + T2 * Colors[2];
-				FinalColor = FinalColor * 255.f;
-				u32 FinalColorU32 = ((u32)0xFF << 24) | ((u32)FinalColor.r << 16) | ((u32)FinalColor.g << 8) | (u32)FinalColor.b;
+				//Формула для обчислення інтерполяції
+				f32 Depth = 1.0f / (T0 * (1.0f / Points[0].z) + T1 * (1.0f / Points[1].z) + T2 * (1.0f / Points[2].z));
+				if (Depth < GlobalState.DepthBuffer[PixelId]) 
+				{
+					//Перетворюємо кольори з одного стандарту в інший
+					v3 FinalColor = T0 * Colors[0] + T1 * Colors[1] + T2 * Colors[2];
+					FinalColor = FinalColor * 255.f;
+					u32 FinalColorU32 = ((u32)0xFF << 24) | ((u32)FinalColor.r << 16) | ((u32)FinalColor.g << 8) | (u32)FinalColor.b;
 
-				GlobalState.FrameBufferPixels[PixelId] = FinalColorU32;
+					GlobalState.FrameBufferPixels[PixelId] = FinalColorU32;                                                      //Записуємо колір в буфер кадрів
+					GlobalState.DepthBuffer[PixelId] = Depth;                                                                 //Записуємо глибинк в буфер глибини
+				}
 			}
 		}
 	}
@@ -191,7 +196,8 @@ int APIENTRY WinMain(
 		GlobalState.FrameBufferHeight = ClientRect.bottom - ClientRect.top;
 		//GlobalState.FrameBufferWidth = 350;
 		//GlobalState.FrameBufferHeight = 350;
-		GlobalState.FrameBufferPixels = (u32*)malloc(sizeof(u32) * GlobalState.FrameBufferWidth * GlobalState.FrameBufferHeight);  //Виділення пам'яті
+		GlobalState.FrameBufferPixels = (u32*)malloc(sizeof(u32) * GlobalState.FrameBufferWidth * GlobalState.FrameBufferHeight);  //Виділення пам'яті буферу кадрів
+		GlobalState.DepthBuffer = (f32*)malloc(sizeof(f32) * GlobalState.FrameBufferWidth * GlobalState.FrameBufferHeight);       //Виділення пам'яті буферу глибини
 	}
 	
 	LARGE_INTEGER BeginTime = {};                                    //Початковий час кадру
@@ -231,15 +237,16 @@ int APIENTRY WinMain(
 		{
 			for (u32 X = 0; X < GlobalState.FrameBufferWidth; ++X)
 			{
-				u32 PixelId = Y * GlobalState.FrameBufferWidth + X;                    //Формула обчисленняя пікселя в пам'яті
+				u32 PixelId = Y * GlobalState.FrameBufferWidth + X;                     //Формула обчисленняя пікселя в пам'яті
 
-				u8 Red = 00;                                                         //Обчислюємо Колір пікселя
+				u8 Red = 00;                                                          //Обчислюємо Колір пікселя
 				u8 Green = 00;
 				u8 Blue = 00;
 				u8 Alfa = 255;
 				u32 PixelColor = ((u32)Alfa << 24) | ((u32)Red << 16) | ((u32)Green << 8) | (u32)Blue;
 
 				GlobalState.FrameBufferPixels[PixelId] = PixelColor;            //Даємо колір Фону Патерн ARGB
+				GlobalState.DepthBuffer[PixelId] = FLT_MAX;                    //Очищуємо буфер кадрів
 
 
 			}
@@ -271,7 +278,7 @@ int APIENTRY WinMain(
 		};
 
 
-		for (i32 TriangleId = 9; TriangleId >= 0; --TriangleId)                                      //Обчислюємо кількість трикутників
+		for (i32 TriangleId = 0; TriangleId <= 10; ++TriangleId)                                      //Обчислюємо кількість трикутників
 		{
 			f32 Depth = powf(2, TriangleId + 1);                                                  //Обчислюємо глибину кожного трикутника
 			    
