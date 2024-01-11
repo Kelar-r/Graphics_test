@@ -99,3 +99,21 @@ v3 operator+(v3 A, v3 B)
 
     return Result;
 }
+
+v3 operator*(f32 A, v3 B)
+{
+    v3 Result = {};
+    Result.x = A * B.x;
+    Result.y = A * B.y;
+    Result.z = A * B.z;
+    return Result;
+}
+
+v3 operator*(v3 B, f32 A)
+{
+    v3 Result = {};
+    Result.x = A * B.x;
+    Result.y = A * B.y;
+    Result.z = A * B.z;
+    return Result;
+}

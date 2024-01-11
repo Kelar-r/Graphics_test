@@ -28,11 +28,30 @@ f32 CrossProduct2d(v2 A, v2 B)
 }
 
 
-void DrawTriangle(v3* Points, u32 Color) 
+void DrawTriangle(v3* Points, v3* Colors) 
 {
 	v2 PointA = ProjetPoint(Points[0]);
 	v2 PointB = ProjetPoint(Points[1]);
 	v2 PointC = ProjetPoint(Points[2]);
+
+	//Для оптимізації ми проходимо тільки потрібні пікселі а не всі і для цього
+	//Знаходимо межі трикутника дивлячись тільки на його кінцеві точки використовуючи найменьші та найбільші точки, важливо округлювати оскільки в дробовій частці може бути середина пікеля
+	i32 MinX = min(min((i32)PointA.x, (i32)PointB.x), (i32)PointC.x);
+	i32 MaxX = max(max((i32)round(PointA.x), (i32)round(PointB.x)), (i32)round(PointC.x));
+	i32 MinY = min(min((i32)PointA.y, (i32)PointB.y), (i32)PointC.y);
+	i32 MaxY = max(max((i32)round(PointA.y), (i32)round(PointB.y)), (i32)round(PointC.y));
+
+	//Перевірка чи трикутник в моніторі
+	MinX = max(0, MinX);                                                              //Перевірка чи найменьше значення трикутника влізає з лівої сторони
+	MinX = min(GlobalState.FrameBufferWidth - 1, MinX);                              //Перевірка чи найменьше значення трикутника влізає з правої сторони
+	MaxX = max(0, MaxX);                                                            //Перевірка чи найбільше значення трикутника влізає з лівої сторони
+	MaxX = min(GlobalState.FrameBufferWidth - 1, MaxX);                            //Перевірка чи найбільше значення трикутника влізає з правої сторони
+
+	MinY = max(0, MinY);                                                         //Перевірка чи меньша сторона трикутника влізає з Нижньої сторони
+	MinY = min(GlobalState.FrameBufferHeight - 1, MinY);                        //Перевірка чи меньша сторона трикутника влізає з Верхньої сторони
+	MaxY = max(0, MaxY);                                                       //Перевірка чи меньша сторона трикутника влізає з Нижньої сторони
+	MaxY = min(GlobalState.FrameBufferHeight - 1, MaxY);                      //Перевірка чи меньша сторона трикутника влізає з Верхньої сторони
+
 
 	//Визначаємо Сторони трикутника
 	v2 Edge0 = PointB - PointA;
@@ -45,11 +64,14 @@ void DrawTriangle(v3* Points, u32 Color)
 	b32 IsTopLeft2 = (Edge2.y > 0.0f) || (Edge2.x > 0.0f && Edge2.y == 0.0f);
 
 
-	for (u32 Y = 0; Y < GlobalState.FrameBufferHeight; ++Y)
+	f32 BarryCentricDiv = CrossProduct2d(PointB - PointA, PointC - PointA);
+
+
+	for (i32 Y = MinY; Y <= MaxY; ++Y)
 	{
-		for (u32 X = 0; X < GlobalState.FrameBufferWidth; ++X)
+		for (i32 X = MinX; X <= MaxX; ++X)
 		{
-			v2 PixelPoint = V2(X, Y) + V2(0.5f, 0.5f);
+			v2 PixelPoint = V2((f32)X, (f32)Y) + V2(0.5f, 0.5f);
 
 			v2 PixelEdge0 = PixelPoint - PointA;
 			v2 PixelEdge1 = PixelPoint - PointB;
@@ -67,7 +89,18 @@ void DrawTriangle(v3* Points, u32 Color)
 			{
 				// Це середина трикутника
 				u32 PixelId = Y * GlobalState.FrameBufferWidth + X;
-				GlobalState.FrameBufferPixels[PixelId] = Color;
+
+				//Обчислюємо барицентричні координати
+				f32 T0 = -CrossLenght1 / BarryCentricDiv;
+				f32 T1 = -CrossLenght2 / BarryCentricDiv;
+				f32 T2 = -CrossLenght0 / BarryCentricDiv;
+
+				//Перетворюємо кольори з одного стандарту в інший
+				v3 FinalColor = T0 * Colors[0] + T1 * Colors[1] + T2 * Colors[2];
+				FinalColor = FinalColor * 255.f;
+				u32 FinalColorU32 = ((u32)0xFF << 24) | ((u32)FinalColor.r << 16) | ((u32)FinalColor.g << 8) | (u32)FinalColor.b;
+
+				GlobalState.FrameBufferPixels[PixelId] = FinalColorU32;
 			}
 		}
 	}
@@ -154,10 +187,10 @@ int APIENTRY WinMain(
 	{
 		RECT ClientRect = {};
 		Assert(GetClientRect(GlobalState.WindowHandle, &ClientRect));
-		//GlobalState.FrameBufferWidth = ClientRect.right - ClientRect.left;
-		//GlobalState.FrameBufferHeight = ClientRect.bottom - ClientRect.top;
-		GlobalState.FrameBufferWidth = 350;
-		GlobalState.FrameBufferHeight = 350;
+		GlobalState.FrameBufferWidth = ClientRect.right - ClientRect.left;
+		GlobalState.FrameBufferHeight = ClientRect.bottom - ClientRect.top;
+		//GlobalState.FrameBufferWidth = 350;
+		//GlobalState.FrameBufferHeight = 350;
 		GlobalState.FrameBufferPixels = (u32*)malloc(sizeof(u32) * GlobalState.FrameBufferWidth * GlobalState.FrameBufferHeight);  //Виділення пам'яті
 	}
 	
@@ -220,6 +253,7 @@ int APIENTRY WinMain(
 			GlobalState.CurrAngle -= 2.0f * Pi32;
 		}
 
+		/*
 		u32 Colors[] = 
 		{
 			0xFF0033AA,                                                                              //UA Blue назва цього кольору
@@ -227,6 +261,13 @@ int APIENTRY WinMain(
 			0xFF3F00FF,
 			0xFF87CEEB,
 			0xFF483D8B,
+		};*/
+
+		v3 Colors[] =
+		{
+			V3(1, 0, 0),
+			V3(0, 1, 0),
+			V3(0, 0, 1),
 		};
 
 
@@ -247,7 +288,7 @@ int APIENTRY WinMain(
 				Points[PointId] = TransformedPos;
 			}
 			
-			DrawTriangle(Points, Colors[TriangleId % (ArrayCount(Colors))]);
+			DrawTriangle(Points, Colors);
 		}
 
 		
