@@ -1,5 +1,6 @@
 #if !defined(WIN32_GRAPHICS_H)
 
+#include <cmath>
 #include <stdint.h>
 #include <stddef.h>
 #include <float.h>
@@ -48,7 +49,7 @@ struct global_state
 	u32* FrameBufferPixels;
 	f32* DepthBuffer;
 
-	f32 CurrOffSet;
+	f32 CurrTime;
 	f32 CurrAngle;
 };
 
