@@ -39,6 +39,17 @@ typedef int32_t b32;
 
 #include "graphics_math.h"
 
+struct camera 
+{
+	v3 Pos;
+
+	f32 Yaw;
+	f32 Pitch;
+
+	b32 PrevMouseDown;
+	v2 PrevMousePos;
+};
+
 struct global_state
 {
 	b32 isRunnig;
@@ -50,7 +61,14 @@ struct global_state
 	f32* DepthBuffer;
 
 	f32 CurrTime;
-	f32 CurrAngle;
+
+	b32 WDown;
+	b32 ADown;
+	b32 SDown;
+	b32 DDown;
+	b32 ShiftDown;
+	b32 SpaceDown;
+	camera Camera;
 };
 
 #define WIN32_GRAPHICS_H

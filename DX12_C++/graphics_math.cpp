@@ -100,6 +100,42 @@ v3 operator+(v3 A, v3 B)
     return Result;
 }
 
+v3 operator+=(v3& A, v3 B)
+{
+    A = A + B;
+
+    return A;
+}
+
+v3 operator-(v3 A, v3 B)
+{
+    v3 Result;
+
+    Result.x = A.x - B.x;
+    Result.y = A.y - B.y;
+    Result.z = A.z - B.z;
+
+    return Result;
+}
+
+v3 operator-(v3 A)
+{
+    v3 Result;
+
+    Result.x = -A.x;
+    Result.y = -A.y;
+    Result.z = -A.z;
+
+    return Result;
+}
+
+v3 operator-=(v3& A, v3 B)
+{
+    A = A - B;
+
+    return A;
+}
+
 v3 operator*(f32 A, v3 B)
 {
     v3 Result = {};
@@ -118,44 +154,42 @@ v3 operator*(v3 B, f32 A)
     return Result;
 }
 
+v3 operator/(v3 B, f32 A)
+{
+    v3 Result = {};
+    Result.x = B.x / A;
+    Result.y = B.y / A;
+    Result.z = B.z / A;
+    return Result;
+}
+
+v3 Normalize(v3 A)
+{
+    f32 Lenght = sqrt(A.x * A.x + A.y * A.y + A.z * A.z);
+    v3 Result = A / Lenght;
+    return Result;
+}
+
 
 //
 // NOTE: V4
 //
+
+v4 V4(f32 X, f32 Y, f32 Z, f32 W)
+{
+    v4 Result = {};
+    Result.x = X;
+    Result.y = Y;
+    Result.z = Z;
+    Result.w = W;
+    return Result;
+}
 
 v4 V4(v3 A, f32 W)
 {
     v4 Result = {};
     Result.xyz = A;
     Result.w = W;
-    return Result;
-}
-
-
-m4 IdentityM4()
-{
-    m4 Result = {};
-    Result.v[0].x = 1.0f;
-    Result.v[1].y = 1.0f;
-    Result.v[2].z = 1.0f;
-    Result.v[3].w = 1.0f;
-    return Result;
-}
-
-m4 ScaleMatrix(f32 X, f32 Y, f32 Z)
-{
-    m4 Result = IdentityM4();
-    Result.v[0].x = X;
-    Result.v[1].y = Y;
-    Result.v[2].z = Z;
-    return Result;
-}
-
-
-m4 TranslationMatrix(f32 X, f32 Y, f32 Z)
-{
-    m4 Result = IdentityM4();
-    Result.v[3].xyz = V3(X, Y, Z);
     return Result;
 }
 
@@ -203,6 +237,40 @@ m4 operator*(m4 A, m4 B)
     return Result;
 }
 
+//
+//Матриці перетворення
+//
+m4 IdentityM4()
+{
+    m4 Result = {};
+    Result.v[0].x = 1.0f;
+    Result.v[1].y = 1.0f;
+    Result.v[2].z = 1.0f;
+    Result.v[3].w = 1.0f;
+    return Result;
+}
+
+m4 ScaleMatrix(f32 X, f32 Y, f32 Z)
+{
+    m4 Result = IdentityM4();
+    Result.v[0].x = X;
+    Result.v[1].y = Y;
+    Result.v[2].z = Z;
+    return Result;
+}
+
+m4 TranslationMatrix(f32 X, f32 Y, f32 Z)
+{
+    m4 Result = IdentityM4();
+    Result.v[3].xyz = V3(X, Y, Z);
+    return Result;
+}
+
+m4 TranslationMatrix(v3 A)
+{
+    m4 Result = TranslationMatrix(A.x, A.y, A.z);
+    return Result;
+}
 
 m4 RotationMatrix(f32 X, f32 Y, f32 Z)
 {

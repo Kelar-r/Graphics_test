@@ -198,10 +198,10 @@ int APIENTRY WinMain(
 	{
 		RECT ClientRect = {};
 		Assert(GetClientRect(GlobalState.WindowHandle, &ClientRect));
-		GlobalState.FrameBufferWidth = ClientRect.right - ClientRect.left;
-		GlobalState.FrameBufferHeight = ClientRect.bottom - ClientRect.top;
-		//GlobalState.FrameBufferWidth = 350;
-		//GlobalState.FrameBufferHeight = 350;
+		//GlobalState.FrameBufferWidth = ClientRect.right - ClientRect.left;
+		//GlobalState.FrameBufferHeight = ClientRect.bottom - ClientRect.top;
+		GlobalState.FrameBufferWidth = 350;
+		GlobalState.FrameBufferHeight = 350;
 		GlobalState.FrameBufferPixels = (u32*)malloc(sizeof(u32) * GlobalState.FrameBufferWidth * GlobalState.FrameBufferHeight);  //Виділення пам'яті буферу кадрів
 		GlobalState.DepthBuffer = (f32*)malloc(sizeof(f32) * GlobalState.FrameBufferWidth * GlobalState.FrameBufferHeight);       //Виділення пам'яті буферу глибини
 	}
@@ -217,20 +217,71 @@ int APIENTRY WinMain(
 		f32 FrameTime = f32(EndTime.QuadPart - BeginTime.QuadPart) / f32(TimerFrequency.QuadPart);             //Формула для обчислення часу кадра
 		BeginTime = EndTime;
 
-
+		
 		MSG Message = {};
 		while (PeekMessageA(&Message, GlobalState.WindowHandle, 0, 0, PM_REMOVE))              //Цикл для перевірки повідомлень
 		{
 			switch (Message.message)                                                           //Світч щоб можна було розібрати різні повідомлення
 			{
-				case WM_QUIT: 
+			case WM_QUIT:
+			{
+				GlobalState.isRunnig = false;
+			} break;
+
+			//Ці методи перевіряють чи нажаті клавіші
+			case WM_KEYDOWN:
+			case WM_KEYUP:
+			{
+				u32 VkCode = Message.wParam;                                       //Зчитумо параметри Натискання клавіші і записуємо результат в змінну вони будуть в ASCII форматі
+				b32 IsDown = !((Message.lParam >> 31) & 0x1);                              //Чи нажата клавіша 
+
+				switch (VkCode)
 				{
-					GlobalState.isRunnig = false;
+				case 'W':
+				{
+					GlobalState.WDown = IsDown;
 				} break;
-				default: {
-					TranslateMessage(&Message);                        //Розшифрування повідомлень
-					DispatchMessage(&Message);                        //реагування на ті повідомлення по замовчуванню
+
+				case 'A':
+				{
+					GlobalState.ADown = IsDown;
+
 				} break;
+
+				case 'S':
+				{
+					GlobalState.SDown = IsDown;
+
+				} break;
+
+				case 'D':
+				{
+					GlobalState.DDown = IsDown;
+
+				} break;
+
+				case VK_SPACE:
+				{
+					GlobalState.SpaceDown = IsDown;
+
+				} break;
+
+				case VK_SHIFT:
+				{
+					GlobalState.ShiftDown = IsDown;
+
+				} break;
+
+				default:
+				{
+				} break;
+				}
+			} break;
+
+			default: {
+				TranslateMessage(&Message);                        //Розшифрування повідомлень
+				DispatchMessage(&Message);                        //реагування на ті повідомлення по замовчуванню
+			} break;
 			}
 		}
 
@@ -239,7 +290,7 @@ int APIENTRY WinMain(
 		GlobalState.CurrTime += Speed * FrameTime;
 
 
-		for (u32 Y = 0; Y < GlobalState.FrameBufferHeight; ++Y) 
+		for (u32 Y = 0; Y < GlobalState.FrameBufferHeight; ++Y)
 		{
 			for (u32 X = 0; X < GlobalState.FrameBufferWidth; ++X)
 			{
@@ -257,26 +308,99 @@ int APIENTRY WinMain(
 
 			}
 		}
-		
-		
-		//Проєктуємо наші трикутники
-		GlobalState.CurrAngle += FrameTime;
-		if (GlobalState.CurrAngle >= 2.0f * Pi32)
+
+		//Проєктуємо нашу камеру
+		m4 CameraTransform = IdentityM4();
 		{
-			GlobalState.CurrAngle -= 2.0f * Pi32;
+			camera* Camera = &GlobalState.Camera;
+
+			b32 MouseDown = false;
+			v2 CurrMousePos = {};
+			if (GetActiveWindow() == GlobalState.WindowHandle)                                                //Перевірка чи наше вікно активне
+			{
+				POINT Win32MousePos = {};
+				Assert(GetCursorPos(&Win32MousePos));                                                      //отримуємо кординати курсора
+				Assert(ScreenToClient(GlobalState.WindowHandle, &Win32MousePos));                         //отримуємо кординати курсора в просторі вікна
+
+				RECT ClientRect = {};
+				Assert(GetClientRect(GlobalState.WindowHandle, &ClientRect));                          //Перетворюння щоб кординати курсора не залежили від розміру вікна
+				Win32MousePos.y = ClientRect.bottom - Win32MousePos.y;                                //Переносимо відлік координат від верху вікна до низу
+
+				CurrMousePos.x = f32(Win32MousePos.x) / f32(ClientRect.right - ClientRect.left);
+				CurrMousePos.y = f32(Win32MousePos.y) / f32(ClientRect.bottom - ClientRect.top);
+
+				MouseDown = (GetKeyState(VK_LBUTTON) & 0x80) != 0;
+			}
+
+			//Перевірка чи кнопка нажата
+			if (MouseDown)
+			{
+				if (!Camera->PrevMouseDown)
+				{
+					Camera->PrevMousePos = CurrMousePos;
+				}
+
+				v2 MouseDelta = CurrMousePos - Camera->PrevMousePos;
+				Camera->Pitch += MouseDelta.y;
+				Camera->Yaw += MouseDelta.x;
+
+				Camera->PrevMousePos = CurrMousePos;
+			}
+
+			Camera->PrevMouseDown = MouseDown;
+
+			m4 YawTransform = RotationMatrix(0, Camera->Yaw, 0);
+			m4 PitchTransform = RotationMatrix(Camera->Pitch, 0, 0);
+			m4 CameraAxisTransform = YawTransform * PitchTransform;
+
+			v3 Right = Normalize((CameraAxisTransform * V4(1, 0, 0, 0)).xyz);
+			v3 Up = Normalize((CameraAxisTransform * V4(0, 1, 0, 0)).xyz);;
+			v3 LookAt = Normalize((CameraAxisTransform * V4(0, 0, 1, 0)).xyz);;
+
+			m4 CameraViewTransform = IdentityM4();
+
+			CameraViewTransform.v[0].x = Right.x;
+			CameraViewTransform.v[1].x = Right.y;
+			CameraViewTransform.v[2].x = Right.z;
+
+			CameraViewTransform.v[0].y = Up.x;
+			CameraViewTransform.v[1].y = Up.y;
+			CameraViewTransform.v[2].y = Up.z;
+
+			CameraViewTransform.v[0].z = LookAt.x;
+			CameraViewTransform.v[1].z = LookAt.y;
+			CameraViewTransform.v[2].z = LookAt.z;
+
+			if (GlobalState.WDown)
+			{
+				Camera->Pos += LookAt * FrameTime;
+				OutputDebugStringA("WDown\n");
+			}
+			if (GlobalState.SDown)
+			{
+				Camera->Pos -= LookAt * FrameTime;
+			}
+			if (GlobalState.ADown)
+			{
+				Camera->Pos -= Right * FrameTime;
+			}
+			if (GlobalState.DDown)
+			{
+				Camera->Pos += Right * FrameTime;
+			}
+			if (GlobalState.SpaceDown)
+			{
+				Camera->Pos += Up * FrameTime;
+			}
+			if (GlobalState.ShiftDown)
+			{
+				Camera->Pos -= Up * FrameTime;
+			}
+
+			CameraTransform = CameraViewTransform * TranslationMatrix(-Camera->Pos);
 		}
 
-		/*
-		u32 Colors[] = 
-		{
-			0xFF0033AA,                                                                              //UA Blue назва цього кольору
-			0xFF1D2951,
-			0xFF3F00FF,
-			0xFF87CEEB,
-			0xFF483D8B,
-		};*/
-
-		// NOTE: Проєктуємо наші трикутники
+		// Проєктуємо наші трикутники
 		GlobalState.CurrTime = GlobalState.CurrTime + FrameTime;
 		if (GlobalState.CurrTime > 2.0f * 3.14159f)
 		{
@@ -302,11 +426,11 @@ int APIENTRY WinMain(
 		{
 			V3(1, 0, 0),
 			V3(0, 1, 0),
-			V3(0, 0, 1),
+			V3(0, 0.2, 0.67),                                                                               //UA Blue назва цього кольору
 			V3(1, 0, 1),
 
 			V3(1, 1, 0),
-			V3(0, 1, 1),
+			V3(0, 0.2, 0.67),
 			V3(1, 0, 1),
 			V3(1, 1, 1),
 		};
@@ -341,7 +465,7 @@ int APIENTRY WinMain(
 
 		f32 Offset = abs(sin(GlobalState.CurrTime));
 
-		m4 Transform = (
+		m4 Transform = (CameraTransform *
 			TranslationMatrix(/*x*/0, /*Y*/0, /*Z*/2) *
 			RotationMatrix(GlobalState.CurrTime, GlobalState.CurrTime, GlobalState.CurrTime) *
 			ScaleMatrix(1, 1, 1));
