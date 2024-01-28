@@ -33,7 +33,7 @@ v3 ColorU32ToRGB(u32 Color)
 	return Result;
 }
 
-u32 ColorRGBToU32(v3 Color)
+u32 ColorRGBToU32(v3 Color)                                //Ця функція Перетворює колір з HEX до вектора, кольори в векторі будуть в проміжку між 0 і 1
 {
 	Color *= 255.0f;
 	u32 Result = ((u32)0xFF << 24) | ((u32)Color.r << 16) | ((u32)Color.g << 8) | (u32)Color.b;
@@ -42,9 +42,9 @@ u32 ColorRGBToU32(v3 Color)
 
 
 void DrawTriangle(
-	v3 ModelVertex0, v3 ModelVertex1, v3 ModelVertex2,
-	v2 ModelUv0, v2 ModelUv1, v2 ModelUv2,
-	m4 Transform, texture Texture, sampler Sampler)
+	v3 ModelVertex0, v3 ModelVertex1, v3 ModelVertex2,   //це точки трикутникка
+	v2 ModelUv0, v2 ModelUv1, v2 ModelUv2,               //тут Uv розгортка
+	m4 Transform, texture Texture, sampler Sampler)      //тут матриця перетворення; текстура; і метод інтерполяції
 {
 	v4 TransformedPoint0 = (Transform * V4(ModelVertex0, 1.0f));
 	v4 TransformedPoint1 = (Transform * V4(ModelVertex1, 1.0f));
@@ -118,7 +118,7 @@ void DrawTriangle(
 				f32 T1 = -CrossLenght2 / BarryCentricDiv;
 				f32 T2 = -CrossLenght0 / BarryCentricDiv;
 
-				//Формула для обчислення інтерполяції
+				//Формула для обчислення барцентричної інтерполяції інтерполяції
 				f32 DepthZ = T0 * TransformedPoint0.z + T1 * TransformedPoint1.z + T2 * TransformedPoint2.z;
 				if (DepthZ >= 0.0f && DepthZ <= 1.0f && DepthZ < GlobalState.DepthBuffer[PixelId]) 
 				{
@@ -128,8 +128,10 @@ void DrawTriangle(
 					Uv /= OneOverW;
 					u32 TexelColor = 0;
 
+					//Вибір методу інтерполяції
 					switch (Sampler.Type)
 					{
+						//Інтерполяція бо ближніх пікселях чітка але по краях текстури погано працює а також є аліас 
 						case Sampler_Type_Nearest: 
 						{
 							i32 TexelX = (i32)floorf(Uv.x * (Texture.Width - 1));
@@ -141,10 +143,11 @@ void DrawTriangle(
 								TexelColor = Texture.Texels[TexelY * Texture.Width + TexelX];
 							}
 							else {
-								TexelColor = 0xFF0033aa;                                                                               //UA Blue назва цього кольору
+								TexelColor = Sampler.BorderColor;
 							}
 						}break;
 
+						//Білінійна інтерполяція текстура стає розмитою але однорідною
 						case Sampler_Type_Bilinear:
 						{
 							v2 TexelV2 = Uv * V2(Texture.Width, Texture.Height) - V2(0.5f, 0.5f);
@@ -286,9 +289,10 @@ int APIENTRY WinMain(
 	LARGE_INTEGER EndTime = {};                                      //Кінцевий час кадру
 	Assert(QueryPerformanceCounter(&BeginTime));                    
 
-	texture CheckerBoardTexture = {};
-	sampler Sampler = {};
-	{
+	
+	texture CheckerBoardTexture = {};                                //Створення екземпляру текстури шахматної доски
+	sampler Sampler = {};                                            //Створення екземпляру Інерполяції
+	{ 
 		Sampler.Type = Sampler_Type_Bilinear;
 		Sampler.BorderColor = 0x000033AA;
 
