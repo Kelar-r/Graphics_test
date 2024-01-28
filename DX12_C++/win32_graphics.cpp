@@ -6,14 +6,11 @@
 global global_state GlobalState;
 
 
-v2 ProjetPoint(v3 WorldPos)
+v2 NdcToPixels(v2 NdcPos)
 {
 	v2 Result = {};
 	// NOTE: Перетворюємо до NDC
-	Result = WorldPos.xy / WorldPos.z;
-
-	// NOTE: Перетворюємо до пікселів
-	Result = 0.5f * (Result + V2(1.0f, 1.0f));
+	Result = 0.5f * (NdcPos + V2(1.0f, 1.0f));
 	Result = V2(GlobalState.FrameBufferWidth, GlobalState.FrameBufferHeight) * Result;
 
 	return Result;
@@ -22,7 +19,7 @@ v2 ProjetPoint(v3 WorldPos)
 
 f32 CrossProduct2d(v2 A, v2 B)
 {
-	f32 Result = A.x * B.y - A.y * B.x;                     //Формула ребра трикутника де A Це кординати пікседя а Б Ребра
+	f32 Result = A.x * B.y - A.y * B.x;                     //Формула ребра трикутника де A Це кординати пікселя а Б Ребра
 	return Result;
 }
 
@@ -32,13 +29,17 @@ void DrawTriangle(
 	v3 ModelColor0, v3 ModelColor1, v3 ModelColor2,
 	m4 Transform)
 {
-	v3 TransformedPoint0 = (Transform * V4(ModelVertex0, 1.0f)).xyz;
-	v3 TransformedPoint1 = (Transform * V4(ModelVertex1, 1.0f)).xyz;
-	v3 TransformedPoint2 = (Transform * V4(ModelVertex2, 1.0f)).xyz;
+	v4 TransformedPoint0 = (Transform * V4(ModelVertex0, 1.0f));
+	v4 TransformedPoint1 = (Transform * V4(ModelVertex1, 1.0f));
+	v4 TransformedPoint2 = (Transform * V4(ModelVertex2, 1.0f));
 
-	v2 PointA = ProjetPoint(TransformedPoint0);
-	v2 PointB = ProjetPoint(TransformedPoint1);
-	v2 PointC = ProjetPoint(TransformedPoint2);
+	TransformedPoint0.xyz /= TransformedPoint0.w;
+	TransformedPoint1.xyz /= TransformedPoint1.w;
+	TransformedPoint2.xyz /= TransformedPoint2.w;
+
+	v2 PointA = NdcToPixels(TransformedPoint0.xy);
+	v2 PointB = NdcToPixels(TransformedPoint1.xy);
+	v2 PointC = NdcToPixels(TransformedPoint2.xy);
 
 	//Для оптимізації ми проходимо тільки потрібні пікселі а не всі і для цього
 	//Знаходимо межі трикутника дивлячись тільки на його кінцеві точки використовуючи найменьші та найбільші точки, важливо округлювати оскільки в дробовій частці може бути середина пікеля
@@ -101,8 +102,8 @@ void DrawTriangle(
 				f32 T2 = -CrossLenght0 / BarryCentricDiv;
 
 				//Формула для обчислення інтерполяції
-				f32 Depth = 1.0f / (T0 * (1.0f / TransformedPoint0.z) + T1 * (1.0f / TransformedPoint1.z) + T2 * (1.0f / TransformedPoint2.z));
-				if (Depth < GlobalState.DepthBuffer[PixelId]) 
+				f32 Depth = T0 * TransformedPoint0.z + T1 * TransformedPoint1.z + T2 * TransformedPoint2.z;
+				if (Depth >= 0.0f && Depth <= 1.0f && Depth < GlobalState.DepthBuffer[PixelId]) 
 				{
 					//Перетворюємо кольори з одного стандарту в інший
 					v3 FinalColor = T0 * ModelColor0 + T1 * ModelColor1 + T2 * ModelColor2;
@@ -198,10 +199,10 @@ int APIENTRY WinMain(
 	{
 		RECT ClientRect = {};
 		Assert(GetClientRect(GlobalState.WindowHandle, &ClientRect));
-		//GlobalState.FrameBufferWidth = ClientRect.right - ClientRect.left;
-		//GlobalState.FrameBufferHeight = ClientRect.bottom - ClientRect.top;
-		GlobalState.FrameBufferWidth = 350;
-		GlobalState.FrameBufferHeight = 350;
+		GlobalState.FrameBufferWidth = ClientRect.right - ClientRect.left;
+		GlobalState.FrameBufferHeight = ClientRect.bottom - ClientRect.top;
+		//GlobalState.FrameBufferWidth = 350;
+		//GlobalState.FrameBufferHeight = 350;
 		GlobalState.FrameBufferPixels = (u32*)malloc(sizeof(u32) * GlobalState.FrameBufferWidth * GlobalState.FrameBufferHeight);  //Виділення пам'яті буферу кадрів
 		GlobalState.DepthBuffer = (f32*)malloc(sizeof(f32) * GlobalState.FrameBufferWidth * GlobalState.FrameBufferHeight);       //Виділення пам'яті буферу глибини
 	}
@@ -309,6 +310,13 @@ int APIENTRY WinMain(
 			}
 		}
 
+
+		RECT ClientRect = {};                                                       //Дізнаємось розмір робочої площі
+		Assert(GetClientRect(GlobalState.WindowHandle, &ClientRect));
+		u32 ClientWidth = ClientRect.right - ClientRect.left;
+		u32 ClientHeight = ClientRect.bottom - ClientRect.top;
+		f32 AspectRation = f32(ClientWidth) / f32(ClientHeight);
+
 		//Проєктуємо нашу камеру
 		m4 CameraTransform = IdentityM4();
 		{
@@ -322,12 +330,10 @@ int APIENTRY WinMain(
 				Assert(GetCursorPos(&Win32MousePos));                                                      //отримуємо кординати курсора
 				Assert(ScreenToClient(GlobalState.WindowHandle, &Win32MousePos));                         //отримуємо кординати курсора в просторі вікна
 
-				RECT ClientRect = {};
-				Assert(GetClientRect(GlobalState.WindowHandle, &ClientRect));                          //Перетворюння щоб кординати курсора не залежили від розміру вікна
 				Win32MousePos.y = ClientRect.bottom - Win32MousePos.y;                                //Переносимо відлік координат від верху вікна до низу
 
-				CurrMousePos.x = f32(Win32MousePos.x) / f32(ClientRect.right - ClientRect.left);
-				CurrMousePos.y = f32(Win32MousePos.y) / f32(ClientRect.bottom - ClientRect.top);
+				CurrMousePos.x = f32(Win32MousePos.x) / f32(ClientWidth);
+				CurrMousePos.y = f32(Win32MousePos.y) / f32(ClientHeight);
 
 				MouseDown = (GetKeyState(VK_LBUTTON) & 0x80) != 0;
 			}
@@ -424,15 +430,15 @@ int APIENTRY WinMain(
 
 		v3 ModelColors[] =
 		{
-			V3(1, 0, 0),
-			V3(0, 1, 0),
-			V3(0, 0.2, 0.67),                                                                               //UA Blue назва цього кольору
-			V3(1, 0, 1),
+			V3(1.0f, 0.0f, 0.0f),
+			V3(0.0f, 1.0f, 0.0f),
+			V3(0.0f, 0.2f, 0.67f),                                                                               //UA Blue назва цього кольору
+			V3(1.0f, 0.0f, 1.0f),
 
-			V3(1, 1, 0),
-			V3(0, 0.2, 0.67),
-			V3(1, 0, 1),
-			V3(1, 1, 1),
+			V3(1.0f, 1.0f, 0.0f),
+			V3(0.0f, 0.2f, 0.67f),
+			V3(1.0f, 0.0f, 1.0f),
+			V3(1.0f, 1.0f, 1.0f),
 		};
 
 		u32 ModelIndices[] = 
@@ -465,10 +471,11 @@ int APIENTRY WinMain(
 
 		f32 Offset = abs(sin(GlobalState.CurrTime));
 
-		m4 Transform = (CameraTransform *
-			TranslationMatrix(/*x*/0, /*Y*/0, /*Z*/2) *
-			RotationMatrix(GlobalState.CurrTime, GlobalState.CurrTime, GlobalState.CurrTime) *
-			ScaleMatrix(1, 1, 1));
+		m4 Transform = (PerspectiveMatrix(120.0f, AspectRation, 0.01f, 1000.0f) *
+						CameraTransform *
+						TranslationMatrix(/*X*/0, /*Y*/0, /*Z*/2) *
+						RotationMatrix(GlobalState.CurrTime, GlobalState.CurrTime, GlobalState.CurrTime) *
+						ScaleMatrix(1, 1, 1));
 
 		for (u32 IndexId = 0; IndexId < ArrayCount(ModelIndices); IndexId += 3 ) 
 		{
@@ -481,12 +488,6 @@ int APIENTRY WinMain(
 				ModelColors[Index0], ModelColors[Index1], ModelColors[Index2],
 				Transform);
 		}
-
-		
-		RECT ClientRect = {};                                                       //Дізнаємось розмір робочої площі
-		Assert(GetClientRect(GlobalState.WindowHandle, &ClientRect));
-		u32 ClientWidth = ClientRect.right - ClientRect.left;
-		u32 ClientHeight = ClientRect.bottom - ClientRect.top;
 		
 
 		BITMAPINFO BitMapInfo = {};

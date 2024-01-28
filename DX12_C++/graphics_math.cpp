@@ -1,4 +1,7 @@
 #include "win32_graphics.h"
+//#using <system.dll>
+//using namespace System::Diagnostics;
+//using namespace System;
 
 //
 // NOTE: V2
@@ -163,6 +166,12 @@ v3 operator/(v3 B, f32 A)
     return Result;
 }
 
+v3 operator/=(v3& A, f32 B)
+{
+    A = A / B;
+    return A;
+}
+
 v3 Normalize(v3 A)
 {
     f32 Lenght = sqrt(A.x * A.x + A.y * A.y + A.z * A.z);
@@ -296,5 +305,22 @@ m4 RotationMatrix(f32 X, f32 Y, f32 Z)
 
 
     Result = RotateZ * RotateY * RotateX;
+    return Result;
+}
+
+m4 PerspectiveMatrix(f32 Fov, f32 AspectRatio, f32 NearZ, f32 FarZ)
+{
+    // NOTE: Ми очікуємо що Fov є у градусів
+    m4 Result = {};
+
+    f32 FovRadians = Fov / 180.0f * Pi32;
+
+
+    Result.v[0].x = 1.0f / (AspectRatio * tan(FovRadians * 0.5f));
+    Result.v[1].y = 1.0f / (tan(FovRadians * 0.5f));
+    Result.v[2].z = -FarZ / (NearZ - FarZ);
+    Result.v[3].z = NearZ * FarZ / (NearZ - FarZ);
+    Result.v[2].w = 1.0f;
+
     return Result;
 }
