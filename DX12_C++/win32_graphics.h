@@ -39,6 +39,28 @@ typedef int32_t b32;
 
 #include "graphics_math.h"
 
+struct texture
+{
+	u32 Width;
+	u32 Height;
+	u32* Texels;
+};
+
+
+enum sampler_type
+{
+	Sampler_Type_None,
+	Sampler_Type_Nearest,
+	Sampler_Type_Bilinear,
+};
+
+
+struct sampler 
+{
+	sampler_type Type;
+	u32 BorderColor;
+};
+
 struct camera 
 {
 	v3 Pos;
@@ -61,6 +83,7 @@ struct global_state
 	f32* DepthBuffer;
 
 	f32 CurrTime;
+	f32 CurrAnimation;
 
 	b32 WDown;
 	b32 ADown;

@@ -1,19 +1,21 @@
 #include "win32_graphics.h"
-//#using <system.dll>
-//using namespace System::Diagnostics;
-//using namespace System;
 
 //
 // NOTE: V2
 //
+v2 V2(f32 Arg)
+{
+    v2 Result = {};
+    Result.x = Arg;
+    Result.y = Arg;
+    return Result;
+}
 
 v2 V2(f32 X, f32 Y)
 {
-    v2 Result;
-
+    v2 Result = {};
     Result.x = X;
     Result.y = Y;
-
     return Result;
 }
 
@@ -73,6 +75,34 @@ v2 operator/(v2 A, f32 B)
 
     Result.x = A.x / B;
     Result.y = A.y / B;
+
+    return Result;
+}
+
+v2 operator/=(v2& A, f32 B) 
+{
+    A = A / B;
+    return A;
+}
+
+//
+// NOTE: V2I
+//
+
+v2i V2I(f32 X, f32 Y)
+{
+    v2i Result = {};
+    Result.x = (i32)X;
+    Result.y = (i32)Y;
+    return Result;
+}
+
+v2i operator+(v2i A, v2i B)
+{
+    v2i Result;
+
+    Result.x = A.x + B.x;
+    Result.y = A.y + B.y;
 
     return Result;
 }
@@ -166,6 +196,12 @@ v3 operator/(v3 B, f32 A)
     return Result;
 }
 
+v3 operator*=(v3& A, f32 B)
+{
+    A = A * B;
+    return A;
+}
+
 v3 operator/=(v3& A, f32 B)
 {
     A = A / B;
@@ -176,6 +212,12 @@ v3 Normalize(v3 A)
 {
     f32 Lenght = sqrt(A.x * A.x + A.y * A.y + A.z * A.z);
     v3 Result = A / Lenght;
+    return Result;
+}
+
+v3 Lerp(v3 A, v3 B, f32 T)
+{
+    v3 Result = (1.0f - T) * A + T * B;
     return Result;
 }
 
