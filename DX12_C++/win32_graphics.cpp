@@ -2,6 +2,7 @@
 
 #include "win32_graphics.h"
 #include "graphics_math.cpp"
+#include "clipper.cpp"
 
 global global_state GlobalState;
 
@@ -41,22 +42,16 @@ u32 ColorRGBToU32(v3 Color)                                //Ця функція Перетвор
 }
 
 
-void DrawTriangle(
-	v3 ModelVertex0, v3 ModelVertex1, v3 ModelVertex2,   //це точки трикутникка
-	v2 ModelUv0, v2 ModelUv1, v2 ModelUv2,               //тут Uv розгортка
-	m4 Transform, texture Texture, sampler Sampler)      //тут матриця перетворення; текстура; і метод інтерполяції
+void DrawTriangle(clip_vertex Vertex0, clip_vertex Vertex1, clip_vertex Vertex2,
+				  texture Texture, sampler Sampler)                         //тут текстура; і метод інтерполяції
 {
-	v4 TransformedPoint0 = (Transform * V4(ModelVertex0, 1.0f));
-	v4 TransformedPoint1 = (Transform * V4(ModelVertex1, 1.0f));
-	v4 TransformedPoint2 = (Transform * V4(ModelVertex2, 1.0f));
+	Vertex0.Pos.xyz /= Vertex0.Pos.w;
+	Vertex1.Pos.xyz /= Vertex1.Pos.w;
+	Vertex2.Pos.xyz /= Vertex2.Pos.w;
 
-	TransformedPoint0.xyz /= TransformedPoint0.w;
-	TransformedPoint1.xyz /= TransformedPoint1.w;
-	TransformedPoint2.xyz /= TransformedPoint2.w;
-
-	v2 PointA = NdcToPixels(TransformedPoint0.xy);
-	v2 PointB = NdcToPixels(TransformedPoint1.xy);
-	v2 PointC = NdcToPixels(TransformedPoint2.xy);
+	v2 PointA = NdcToPixels(Vertex0.Pos.xy);
+	v2 PointB = NdcToPixels(Vertex1.Pos.xy);
+	v2 PointC = NdcToPixels(Vertex2.Pos.xy);
 
 	//Для оптимізації ми проходимо тільки потрібні пікселі а не всі і для цього
 	//Знаходимо межі трикутника дивлячись тільки на його кінцеві точки використовуючи найменьші та найбільші точки, важливо округлювати оскільки в дробовій частці може бути середина пікеля
@@ -64,7 +59,7 @@ void DrawTriangle(
 	i32 MaxX = max(max((i32)round(PointA.x), (i32)round(PointB.x)), (i32)round(PointC.x));
 	i32 MinY = min(min((i32)PointA.y, (i32)PointB.y), (i32)PointC.y);
 	i32 MaxY = max(max((i32)round(PointA.y), (i32)round(PointB.y)), (i32)round(PointC.y));
-
+#if 0
 	//Перевірка чи трикутник в моніторі
 	MinX = max(0, MinX);                                                              //Перевірка чи найменьше значення трикутника влізає з лівої сторони
 	MinX = min(GlobalState.FrameBufferWidth - 1, MinX);                              //Перевірка чи найменьше значення трикутника влізає з правої сторони
@@ -75,7 +70,7 @@ void DrawTriangle(
 	MinY = min(GlobalState.FrameBufferHeight - 1, MinY);                        //Перевірка чи меньша сторона трикутника влізає з Верхньої сторони
 	MaxY = max(0, MaxY);                                                       //Перевірка чи меньша сторона трикутника влізає з Нижньої сторони
 	MaxY = min(GlobalState.FrameBufferHeight - 1, MaxY);                      //Перевірка чи меньша сторона трикутника влізає з Верхньої сторони
-
+#endif
 
 	//Визначаємо Сторони трикутника
 	v2 Edge0 = PointB - PointA;
@@ -119,12 +114,12 @@ void DrawTriangle(
 				f32 T2 = -CrossLenght0 / BarryCentricDiv;
 
 				//Формула для обчислення барцентричної інтерполяції інтерполяції
-				f32 DepthZ = T0 * TransformedPoint0.z + T1 * TransformedPoint1.z + T2 * TransformedPoint2.z;
+				f32 DepthZ = T0 * Vertex0.Pos.z + T1 * Vertex1.Pos.z + T2 * Vertex2.Pos.z;
 				if (DepthZ >= 0.0f && DepthZ <= 1.0f && DepthZ < GlobalState.DepthBuffer[PixelId]) 
 				{
-					f32 OneOverW = T0 * ( 1 / TransformedPoint0.w) + T1 * (1 / TransformedPoint1.w) + T2 * (1 / TransformedPoint2.w);
+					f32 OneOverW = T0 * ( 1 / Vertex0.Pos.w) + T1 * (1 / Vertex1.Pos.w) + T2 * (1 / Vertex2.Pos.w);
 					
-					v2 Uv = T0 * (ModelUv0 / TransformedPoint0.w) + T1 * (ModelUv1 / TransformedPoint1.w) + T2 * (ModelUv2 / TransformedPoint2.w);
+					v2 Uv = T0 * (Vertex0.Uv / Vertex0.Pos.w) + T1 * (Vertex1.Uv / Vertex1.Pos.w) + T2 * (Vertex2.Uv / Vertex2.Pos.w);
 					Uv /= OneOverW;
 					u32 TexelColor = 0;
 
@@ -183,7 +178,7 @@ void DrawTriangle(
 
 						default: 
 						{
-							InvalideCodePatch;
+							InvalidCodePath;
 						}break;
 					}
 					
@@ -195,6 +190,35 @@ void DrawTriangle(
 		}
 	}
 }
+
+
+void DrawTriangle(v4 ModelVertex0, v4 ModelVertex1, v4 ModelVertex2,
+	v2 ModelUv0, v2 ModelUv1, v2 ModelUv2,
+	texture Texture, sampler Sampler)
+{
+	clip_result Ping = {};
+	Ping.NumTriangles = 1;
+	Ping.Vertices[0] = { ModelVertex0, ModelUv0 };
+	Ping.Vertices[1] = { ModelVertex1, ModelUv1 };
+	Ping.Vertices[2] = { ModelVertex2, ModelUv2 };
+
+	clip_result Pong = {};
+
+	ClipPolygonToAxis(&Ping, &Pong, ClipAxis_Left);
+	ClipPolygonToAxis(&Pong, &Ping, ClipAxis_Right);
+	ClipPolygonToAxis(&Ping, &Pong, ClipAxis_Top);
+	ClipPolygonToAxis(&Pong, &Ping, ClipAxis_Bottom);
+	ClipPolygonToAxis(&Ping, &Pong, ClipAxis_Near);
+	ClipPolygonToAxis(&Pong, &Ping, ClipAxis_Far);
+	ClipPolygonToAxis(&Ping, &Pong, ClipAxis_W);
+
+	for (u32 TriangleId = 0; TriangleId < Pong.NumTriangles; ++TriangleId)
+	{
+		DrawTriangle(Pong.Vertices[3 * TriangleId + 0], Pong.Vertices[3 * TriangleId + 1],
+			Pong.Vertices[3 * TriangleId + 2], Texture, Sampler);
+	}
+}
+
 
 
 LRESULT Win32WindowsCallBack(
@@ -246,7 +270,7 @@ int APIENTRY WinMain(
 
 		if (!RegisterClassA(&WindowClass))
 		{
-			InvalideCodePatch;
+			InvalidCodePath;
 		}
 
 
@@ -267,7 +291,7 @@ int APIENTRY WinMain(
 
 		if (!GlobalState.WindowHandle)
 		{
-			InvalideCodePatch;
+			InvalidCodePath;
 		}
 
 		GlobalState.DeviceContext = GetDC(GlobalState.WindowHandle);
@@ -524,7 +548,6 @@ int APIENTRY WinMain(
 			GlobalState.CurrTime -= 2.0f * 3.14159f;
 		}
 
-
 		v3 ModelVertices[] =
 		{
 			//Передня сторона
@@ -581,9 +604,8 @@ int APIENTRY WinMain(
 		};
 
 
+
 		f32 Offset = abs(sin(GlobalState.CurrTime));
-
-
 		GlobalState.CurrAnimation = 0;
 
 		m4 Transform = (PerspectiveMatrix(60.0f, AspectRation, 0.01f, 1000.0f) *
@@ -592,18 +614,25 @@ int APIENTRY WinMain(
 						RotationMatrix(GlobalState.CurrAnimation, GlobalState.CurrAnimation, GlobalState.CurrAnimation) *
 						ScaleMatrix(1, 1, 1));
 
-		for (u32 IndexId = 0; IndexId < ArrayCount(ModelIndices); IndexId += 3 ) 
+		v4* TransformedVertices = (v4*)malloc(sizeof(v4) * ArrayCount(ModelVertices));
+		for (u32 VertexId = 0; VertexId < ArrayCount(ModelVertices); ++VertexId)
+		{
+			TransformedVertices[VertexId] = (Transform * V4(ModelVertices[VertexId], 1.0f));
+		}
+
+		for (u32 IndexId = 0; IndexId < ArrayCount(ModelIndices); IndexId += 3)
 		{
 			u32 Index0 = ModelIndices[IndexId + 0];
 			u32 Index1 = ModelIndices[IndexId + 1];
 			u32 Index2 = ModelIndices[IndexId + 2];
 
-			DrawTriangle(
-				ModelVertices[Index0], ModelVertices[Index1], ModelVertices[Index2],
+			DrawTriangle(TransformedVertices[Index0], TransformedVertices[Index1], TransformedVertices[Index2],
 				ModelUvs[Index0], ModelUvs[Index1], ModelUvs[Index2],
-				Transform, CheckerBoardTexture, Sampler);
+				CheckerBoardTexture, Sampler);
 		}
-		
+
+		free(TransformedVertices);
+
 
 		BITMAPINFO BitMapInfo = {};
 		BitMapInfo.bmiHeader.biSize = sizeof(tagBITMAPINFOHEADER);

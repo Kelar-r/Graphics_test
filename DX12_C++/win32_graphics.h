@@ -1,3 +1,4 @@
+#pragma once
 #if !defined(WIN32_GRAPHICS_H)
 
 #include <cmath>
@@ -29,7 +30,7 @@ typedef int32_t b32;
 
 #define snpintf _snpintf_s
 #define Assert(Expression) if (!(Expression)) {__debugbreak();}
-#define InvalideCodePatch Assert(!"Invalide Code Path")
+#define InvalidCodePath Assert(!"Invalide Code Path")
 #define ArrayCount(Array) (sizeof(Array)) / sizeof((Array)[0])
 
 #define KiloBytes(Val) ((Val)*1024LL)
@@ -38,6 +39,7 @@ typedef int32_t b32;
 #define TeraBytes(Val) (GigaBytes(Val)*1024LL)
 
 #include "graphics_math.h"
+#include "clipper.h"
 
 struct texture
 {
